@@ -1,33 +1,30 @@
 import tkinter as tk
-import time
-import random
+from PIL import Image, ImageTk
 
 class PomodoroTimer:
     def __init__(self, master):
         self.master = master
         master.title("Pomodoro Timer")
-        # get the window dimensions
-        window_width = self.master.winfo_screenwidth()
-        window_height = self.master.winfo_screenheight()
-        # calculate the center point
-        center_x = int(window_width/2 - 250)
-        center_y = int(window_height/2 - 250)
-        # set the window position and dimensions
-        self.master.geometry("500x500+{}+{}".format(center_x, center_y))
+        self.master.geometry("500x500")
+        
+        self.work_image = Image.open("working.png")
+        self.rest_image = Image.open("resting.png")
+        
+        self.work_image = self.resize_image(self.work_image)
+        self.rest_image = self.resize_image(self.rest_image)
         
         self.gifs = [
-            tk.PhotoImage(file="work.gif"),
-            tk.PhotoImage(file="work2.gif"),
-            tk.PhotoImage(file="work4.gif")
+            ImageTk.PhotoImage(self.work_image),
+            ImageTk.PhotoImage(self.rest_image)
         ]
-        
-        # Create the label for the GIFs
-        self.gif_label = tk.Label(master, width=window_width, height=window_height)
-        self.gif_label.pack()
 
-        # Start the animation loop
-        self.animate()
-        # Create input fields for work and rest times
+        self.work_seconds = 0
+        self.rest_seconds = 0
+        self.is_working = False
+        
+        self.canvas = tk.Canvas(master, width=500, height=500)
+        self.canvas.pack()
+
         self.work_label = tk.Label(master, text="Work Time (min):", font=("Arial", 10))
         self.work_label.pack()
         self.work_entry = tk.Entry(master, font=("Arial", 10))
@@ -40,63 +37,62 @@ class PomodoroTimer:
         self.rest_label.place(relx=0.5, rely=0.45, anchor=tk.CENTER)
         self.rest_entry.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         
-        # Add a button to start the timer
         self.start_button = tk.Button(master, text="Start", command=self.start_timer, font=("Arial", 8))
         self.start_button.pack()
         self.start_button.place(relx=0.5, rely=0.6, anchor=tk.CENTER)
         
-        # Add a label to display the countdown
         self.countdown_label = tk.Label(master, text="", font=("Arial", 14))
         self.countdown_label.pack()
         self.countdown_label.place(relx=0.5, rely=0.75, anchor=tk.CENTER)
-    
-    def animate(self):
-        # Choose a random GIF
-        gif = random.choice(self.gifs)
 
-        # Update the label with the new GIF
-        self.gif_label.config(image=gif)
+    def resize_image(self, image):
+        window_width = 500
+        window_height = 500
 
-        # Schedule the next animation after 2 seconds
-        self.master.after(2000, self.animate)
-  
+        image = image.resize((window_width, window_height), Image.BILINEAR)
+
+        return image
+
+    def update_image(self):
+        if self.is_working:
+            gif = self.gifs[0]  # Use working image
+        else:
+            gif = self.gifs[1]  # Use resting image
+
+        self.canvas.delete("background")
+        self.canvas.create_image(0, 0, image=gif, anchor=tk.NW, tags="background")
+
     def start_timer(self):
-        # Get the work and rest times from the input fields
         work_time = int(self.work_entry.get())
         rest_time = int(self.rest_entry.get())
-        
-        # Convert the times from minutes to seconds
-        work_seconds = work_time * 60
-        rest_seconds = rest_time * 60
-        
-        # Start the timer
-        running = True
-        while running:
-            # Work time
-            self.countdown(work_seconds, "Work")
-            # Rest time
-            self.countdown(rest_seconds, "Rest")
-            
-    def countdown(self, t, label):
-        while t:
-            min, sec = divmod(t, 60)
-            countdown_text = f"{label}: {min:02d}:{sec:02d}"
+
+        self.work_seconds = work_time * 60
+        self.rest_seconds = rest_time * 60
+        self.is_working = True
+
+        self.run_timer(self.work_seconds)  # Start with the work timer
+
+    def run_timer(self, time_remaining):
+        if time_remaining > 0:
+            min, sec = divmod(time_remaining, 60)
+            countdown_text = f"{min:02d}:{sec:02d}"
             self.countdown_label.config(text=countdown_text)
-            self.master.update()
-            time.sleep(1) 
-            t -= 1
-            if label == "Rest" and t == 0 or label == "Work" and t == 0:
+
+            self.update_image()
+
+            time_remaining -= 1
+            self.master.after(1000, self.run_timer, time_remaining)
+        else:
+            self.is_working = not self.is_working
+            if self.is_working:
                 self.countdown_label.config(text="Drink some water")
-                self.master.update()
-                time.sleep(5)
+                self.update_image()
+                self.master.after(5000, self.run_timer, self.rest_seconds)
+            else:
                 self.countdown_label.config(text="Drink some water NOW")
-                self.master.update()
+                self.update_image()
+                self.master.after(5000, self.run_timer, self.work_seconds)
 
-# Create the main window
 root = tk.Tk()
-# Create an instance of the PomodoroTimer class
 timer = PomodoroTimer(root)
-background = PomodoroTimer(root)
-
-# Start the event loop
 root.mainloop()
